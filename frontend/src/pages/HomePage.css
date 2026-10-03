@@ -1,0 +1,15 @@
+.cattle-silhouette {
+  width: 82%;
+  height: 66%;
+  left: 8%;
+  top: 18%;
+  color: #9ae8c4;
+  transform: none;
+  filter: drop-shadow(0 0 22px rgba(150, 255, 209, .35));
+}
+
+.cattle-silhouette img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+@media (max-width: 680px) {
+  .cattle-silhouette { width: 86%; height: 62%; left: 5%; top: 21%; }
+}

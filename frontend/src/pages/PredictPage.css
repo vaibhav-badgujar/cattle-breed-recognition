@@ -1,0 +1,15 @@
+.camera-feed {
+  width: calc(100% + 50px);
+  height: 270px;
+  object-fit: cover;
+  background: #05221c;
+}
+
+.camera-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.camera-controls .btn { padding: 9px 13px; }
