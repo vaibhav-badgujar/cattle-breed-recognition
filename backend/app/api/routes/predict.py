@@ -1,9 +1,12 @@
 """
 Prediction endpoints.
-POST /predict/file  - Upload image file
-POST /predict/url   - Predict from image URL
+
+POST /predict/file   - Upload image file
+POST /predict/url    - Predict from image URL
 POST /predict/base64 - Predict from base64 image
 """
+
+import os
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 
@@ -26,6 +29,13 @@ from backend.app.core.logging import logger
 
 
 router = APIRouter(prefix="/predict", tags=["Prediction"])
+
+
+# Enable/disable YOLO-World bovine validation using an environment variable.
+# Default is True so local behavior remains unchanged.
+BOVINE_VALIDATOR_ENABLED = (
+    os.getenv("BOVINE_VALIDATOR_ENABLED", "true").lower() == "true"
+)
 
 
 def _build_response(result: dict) -> PredictResponse:
@@ -58,8 +68,16 @@ def _validate_bovine_image(image):
     """
     Validate that the uploaded image contains cattle or buffalo.
 
-    This runs BEFORE the breed classifier.
+    YOLO-World validation is performed only when
+    BOVINE_VALIDATOR_ENABLED=true.
     """
+
+    # Skip YOLO-World validation when disabled.
+    if not BOVINE_VALIDATOR_ENABLED:
+        logger.info(
+            "Bovine validator disabled; skipping validation"
+        )
+        return None
 
     if not bovine_validator.is_loaded:
         raise HTTPException(
@@ -103,10 +121,11 @@ async def predict_file(
 
         image = load_image_from_upload(contents)
 
-        # Validate bovine before breed prediction
+        # Validate bovine before breed prediction.
+        # Validation is skipped automatically when disabled.
         _validate_bovine_image(image)
 
-        # Existing breed classifier remains unchanged
+        # Existing breed classifier remains unchanged.
         result = inference_service.predict(
             image,
             top_k=top_k,
@@ -145,10 +164,10 @@ async def predict_url(request: PredictURLRequest):
     try:
         image = load_image_from_url(request.url)
 
-        # Validate bovine before breed prediction
+        # Validate bovine before breed prediction.
         _validate_bovine_image(image)
 
-        # Existing breed classifier remains unchanged
+        # Existing breed classifier remains unchanged.
         result = inference_service.predict(
             image,
             top_k=request.top_k,
@@ -187,10 +206,10 @@ async def predict_base64(request: PredictBase64Request):
     try:
         image = load_image_from_base64(request.image)
 
-        # Validate bovine before breed prediction
+        # Validate bovine before breed prediction.
         _validate_bovine_image(image)
 
-        # Existing breed classifier remains unchanged
+        # Existing breed classifier remains unchanged.
         result = inference_service.predict(
             image,
             top_k=request.top_k,

@@ -4,15 +4,18 @@ Cattle Breed Classifier API.
 """
 
 import sys
+import os
 from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+
 # Ensure project root is in path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
+
 
 from backend.app.core.config import get_settings
 from backend.app.core.logging import logger
@@ -21,16 +24,40 @@ from backend.app.services.inference import inference_service
 from backend.app.services.breed_info import breed_info_service
 from backend.app.services.bovine_validator import bovine_validator
 
+
+# Enable/disable YOLO-World bovine validation using an environment variable.
+# Default is True so local behavior remains unchanged.
+BOVINE_VALIDATOR_ENABLED = (
+    os.getenv("BOVINE_VALIDATOR_ENABLED", "true").lower() == "true"
+)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
+
     # Startup
     logger.info("Starting Cattle Breed Classifier API...")
+
     try:
+        # Load the main breed classification model.
         inference_service.load()
+
+        # Load optional breed metadata.
         breed_info_service.load()
-        bovine_validator.load()
+
+        # Load YOLO-World only when enabled.
+        if BOVINE_VALIDATOR_ENABLED:
+            bovine_validator.load()
+            logger.info("Bovine validator enabled")
+        else:
+            logger.info(
+                "Bovine validator disabled; "
+                "YOLO-World will not be loaded"
+            )
+
         logger.info("All services loaded successfully")
+
     except Exception as e:
         logger.error(f"Startup error: {e}")
         logger.info("API started with limited functionality")
@@ -43,6 +70,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
+
     settings = get_settings()
 
     app = FastAPI(
@@ -74,27 +102,46 @@ def create_app() -> FastAPI:
 
     # Serve Static frontend if it exists
     static_dir = PROJECT_ROOT / "frontend" / "dist"
+
     if static_dir.exists() and static_dir.is_dir():
+
         from fastapi.staticfiles import StaticFiles
         from fastapi.responses import FileResponse
-        
-        # Mount assets
+
+        # Mount frontend assets
         assets_dir = static_dir / "assets"
+
         if assets_dir.exists():
-            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+            app.mount(
+                "/assets",
+                StaticFiles(directory=str(assets_dir)),
+                name="assets",
+            )
 
         @app.get("/", tags=["Root"])
         async def root():
-            return FileResponse(str(static_dir / "index.html"))
-            
-        # Catch-all for react router
+            return FileResponse(
+                str(static_dir / "index.html")
+            )
+
+        # Catch-all for React Router
         @app.get("/{full_path:path}", tags=["Root"])
         async def serve_spa(full_path: str):
-            # Exclude api requests
-            if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("redoc"):
+
+            # Exclude API/documentation requests
+            if (
+                full_path.startswith("api/")
+                or full_path.startswith("docs")
+                or full_path.startswith("redoc")
+            ):
                 return {"detail": "Not Found"}
-            return FileResponse(str(static_dir / "index.html"))
+
+            return FileResponse(
+                str(static_dir / "index.html")
+            )
+
     else:
+
         @app.get("/", tags=["Root"])
         async def root():
             return {
@@ -111,7 +158,9 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
+
     settings = get_settings()
+
     uvicorn.run(
         "backend.app.main:app",
         host=settings.host,
